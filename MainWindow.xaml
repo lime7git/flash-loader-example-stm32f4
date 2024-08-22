@@ -92,13 +92,40 @@
                 <TextBox x:Name="textBoxReceivedDataHex" Background="#8D8D8D" Grid.Row="2" Grid.Column="1" Margin="10" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" IsReadOnly="True" AcceptsReturn="True" Height="150" TextWrapping="Wrap"/>
 
                 <!-- Hex Viewer -->
-                <RichTextBox x:Name="hexViewer" Background="#8D8D8D" Grid.Row="1" Grid.ColumnSpan="2" Margin="10" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
+                <DataGrid x:Name="hexViewerDataGrid" Grid.Row="1" Grid.ColumnSpan="2" Margin="10" AutoGenerateColumns="False" HeadersVisibility="Column" 
+                          Background="#8D8D8D" Foreground="#8D8D8D" CanUserAddRows="False" IsReadOnly="True" FontFamily="Consolas" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <DataGrid.Columns >
+                        <!-- Address Column -->
+                        <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="80"/>
+
+                        <!-- Hex Columns (0 to F) -->
+                        <DataGridTextColumn Header="00" Binding="{Binding Hex00}" Width="40"/>
+                        <DataGridTextColumn Header="01" Binding="{Binding Hex01}" Width="40"/>
+                        <DataGridTextColumn Header="02" Binding="{Binding Hex02}" Width="40"/>
+                        <DataGridTextColumn Header="03" Binding="{Binding Hex03}" Width="40"/>
+                        <DataGridTextColumn Header="04" Binding="{Binding Hex04}" Width="40"/>
+                        <DataGridTextColumn Header="05" Binding="{Binding Hex05}" Width="40"/>
+                        <DataGridTextColumn Header="06" Binding="{Binding Hex06}" Width="40"/>
+                        <DataGridTextColumn Header="07" Binding="{Binding Hex07}" Width="40"/>
+                        <DataGridTextColumn Header="08" Binding="{Binding Hex08}" Width="40"/>
+                        <DataGridTextColumn Header="09" Binding="{Binding Hex09}" Width="40"/>
+                        <DataGridTextColumn Header="0A" Binding="{Binding Hex0A}" Width="40"/>
+                        <DataGridTextColumn Header="0B" Binding="{Binding Hex0B}" Width="40"/>
+                        <DataGridTextColumn Header="0C" Binding="{Binding Hex0C}" Width="40"/>
+                        <DataGridTextColumn Header="0D" Binding="{Binding Hex0D}" Width="40"/>
+                        <DataGridTextColumn Header="0E" Binding="{Binding Hex0E}" Width="40"/>
+                        <DataGridTextColumn Header="0F" Binding="{Binding Hex0F}" Width="40"/>
+
+                        <!-- ASCII Dump Column -->
+                        <DataGridTextColumn Header="DUMP" Binding="{Binding AsciiDump}" Width="160"/>
+                    </DataGrid.Columns>
+                </DataGrid>
 
                 <!-- Send Data -->
-                <Button x:Name="buttonSendData" Grid.Row="4" Grid.ColumnSpan="2" Content="SEND" Height="30" Width="100" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,10" Click="ButtonSendData_Click"/>
+                <Button x:Name="buttonSendData" Grid.Row="4" Grid.ColumnSpan="2" Content="SEND" Height="45" Width="100" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,20" Click="ButtonSendData_Click"/>
                 
                 <!-- Data to send input -->
-                <TextBox x:Name="textBoxSendData" Background="#8D8D8D" Grid.Row="4" Grid.ColumnSpan="2" Height="30" Margin="10,0,120,10" VerticalAlignment="Center" />
+                <TextBox x:Name="textBoxSendData" Background="#8D8D8D" Grid.Row="4" Grid.ColumnSpan="2" Height="45" Margin="10,0,120,20" VerticalAlignment="Center" />
             </Grid>
         </DockPanel>
     </Grid>

@@ -7,6 +7,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
+using Microsoft.Win32;
+using System.Collections.Generic;
 
 namespace IMAGOPrinterProgrammerTool
 {
@@ -15,6 +17,28 @@ namespace IMAGOPrinterProgrammerTool
         private SerialPort serialPort;
         private StringBuilder receivedDataASCII = new StringBuilder();
         private StringBuilder receivedDataHex = new StringBuilder();
+
+        public class HexViewerRow
+        {
+            public string Address { get; set; }
+            public string Hex00 { get; set; }
+            public string Hex01 { get; set; }
+            public string Hex02 { get; set; }
+            public string Hex03 { get; set; }
+            public string Hex04 { get; set; }
+            public string Hex05 { get; set; }
+            public string Hex06 { get; set; }
+            public string Hex07 { get; set; }
+            public string Hex08 { get; set; }
+            public string Hex09 { get; set; }
+            public string Hex0A { get; set; }
+            public string Hex0B { get; set; }
+            public string Hex0C { get; set; }
+            public string Hex0D { get; set; }
+            public string Hex0E { get; set; }
+            public string Hex0F { get; set; }
+            public string AsciiDump { get; set; }
+        }
 
         public MainWindow()
         {
@@ -109,22 +133,50 @@ namespace IMAGOPrinterProgrammerTool
 
         private void ButtonLoadFile_Click(object sender, RoutedEventArgs e)
         {
-            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
-            dlg.Filter = "Binary Files (*.bin)|*.bin|All Files (*.*)|*.*";
-            bool? result = dlg.ShowDialog();
-
-            if (result == true)
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            if (openFileDialog.ShowDialog() == true)
             {
-                string filePath = dlg.FileName;
-                DisplayFileAsHex(filePath);
+                byte[] fileBytes = File.ReadAllBytes(openFileDialog.FileName);
+                DisplayHexData(fileBytes);
             }
         }
 
-        private void DisplayFileAsHex(string filePath)
+        private void DisplayHexData(byte[] data)
         {
-            byte[] fileBytes = File.ReadAllBytes(filePath);
-            hexViewer.Document.Blocks.Clear();
-            hexViewer.AppendText(BitConverter.ToString(fileBytes).Replace("-", " "));
+            var hexViewerRows = new List<HexViewerRow>();
+
+            for (int i = 0; i < data.Length; i += 16)
+            {
+                var row = new HexViewerRow();
+                row.Address = i.ToString("X8");
+
+                var hexValues = new StringBuilder();
+                var asciiValues = new StringBuilder();
+
+                for (int j = 0; j < 16; j++)
+                {
+                    if (i + j < data.Length)
+                    {
+                        byte b = data[i + j];
+                        string hex = b.ToString("X2");
+                        string ascii = b >= 32 && b <= 126 ? ((char)b).ToString() : ".";
+
+                        hexValues.Append(hex + " ");
+                        asciiValues.Append(ascii);
+
+                        row.GetType().GetProperty($"Hex{j:X2}").SetValue(row, hex);
+                    }
+                    else
+                    {
+                        hexValues.Append("   "); // Placeholder for missing data in the last row
+                    }
+                }
+
+                row.AsciiDump = asciiValues.ToString();
+                hexViewerRows.Add(row);
+            }
+
+            hexViewerDataGrid.ItemsSource = hexViewerRows;
         }
 
         private void ButtonSendData_Click(object sender, RoutedEventArgs e)
