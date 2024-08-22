@@ -1,0 +1,103 @@
+﻿using System;
+using System.IO.Ports;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+
+namespace IMAGOPrinterProgrammerTool
+{
+    public partial class MainWindow : Window
+    {
+        private SerialPort serialPort;
+
+        public MainWindow()
+        {
+            InitializeComponent();
+            InitializeDefaults();
+            buttonScan.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        }
+
+        private void InitializeDefaults()
+        {
+            comboBoxBaudRate.SelectedIndex = 1;
+            comboBoxParity.SelectedIndex = 1;
+            comboBoxDataBits.SelectedIndex = 0;
+        }
+
+        private void ButtonScan_Click(object sender, RoutedEventArgs e)
+        {
+            comboBoxCOMPorts.Items.Clear();
+            string[] ports = SerialPort.GetPortNames();
+            foreach (var port in ports)
+            {
+                comboBoxCOMPorts.Items.Add(port);
+            }
+
+            if (comboBoxCOMPorts.Items.Count > 0)
+                comboBoxCOMPorts.SelectedIndex = 0;
+            else
+                MessageBox.Show("No COM ports found!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private void ButtonConnect_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (comboBoxCOMPorts.SelectedItem == null)
+                {
+                    MessageBox.Show("Please select a COM port", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                serialPort = new SerialPort(comboBoxCOMPorts.SelectedItem.ToString())
+                {
+                    BaudRate = int.Parse((comboBoxBaudRate.SelectedItem as ComboBoxItem).Content.ToString()),
+                    Parity = (Parity)Enum.Parse(typeof(Parity), (comboBoxParity.SelectedItem as ComboBoxItem).Content.ToString()),
+                    DataBits = int.Parse((comboBoxDataBits.SelectedItem as ComboBoxItem).Content.ToString()),
+                    StopBits = StopBits.One
+                };
+
+                serialPort.Open();
+                MessageBox.Show("Connected to " + serialPort.PortName, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                buttonDisconnect.Visibility = Visibility.Visible;
+                buttonConnect.Visibility = Visibility.Collapsed;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error connecting to COM port: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ButtonDisconnect_Click(object sender, RoutedEventArgs e)
+        {
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.Close();
+                MessageBox.Show("Disconnected", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                buttonDisconnect.Visibility = Visibility.Collapsed;
+                buttonConnect.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ButtonLoadFile_Click(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
+            dlg.Filter = "Binary Files (*.bin)|*.bin|All Files (*.*)|*.*";
+            bool? result = dlg.ShowDialog();
+
+            if (result == true)
+            {
+                string filePath = dlg.FileName;
+                DisplayFileAsHex(filePath);
+            }
+        }
+
+        private void DisplayFileAsHex(string filePath)
+        {
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            hexViewer.Document.Blocks.Clear();
+            hexViewer.AppendText(BitConverter.ToString(fileBytes).Replace("-", " "));
+        }
+    }
+}
