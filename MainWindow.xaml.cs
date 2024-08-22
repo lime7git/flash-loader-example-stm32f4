@@ -1,15 +1,20 @@
 ﻿using System;
 using System.IO.Ports;
 using System.IO;
+using System.Text;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 
 namespace IMAGOPrinterProgrammerTool
 {
     public partial class MainWindow : Window
     {
         private SerialPort serialPort;
+        private StringBuilder receivedDataASCII = new StringBuilder();
+        private StringBuilder receivedDataHex = new StringBuilder();
 
         public MainWindow()
         {
@@ -39,7 +44,6 @@ namespace IMAGOPrinterProgrammerTool
             else
                 MessageBox.Show("No COM ports found!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-
         private void ButtonConnect_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -55,10 +59,13 @@ namespace IMAGOPrinterProgrammerTool
                     BaudRate = int.Parse((comboBoxBaudRate.SelectedItem as ComboBoxItem).Content.ToString()),
                     Parity = (Parity)Enum.Parse(typeof(Parity), (comboBoxParity.SelectedItem as ComboBoxItem).Content.ToString()),
                     DataBits = int.Parse((comboBoxDataBits.SelectedItem as ComboBoxItem).Content.ToString()),
-                    StopBits = StopBits.One
+                    StopBits = StopBits.One,
+                    Encoding = Encoding.ASCII
                 };
 
+                serialPort.DataReceived += SerialPort_DataReceived;
                 serialPort.Open();
+
                 MessageBox.Show("Connected to " + serialPort.PortName, "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                 buttonDisconnect.Visibility = Visibility.Visible;
                 buttonConnect.Visibility = Visibility.Collapsed;
@@ -67,6 +74,26 @@ namespace IMAGOPrinterProgrammerTool
             {
                 MessageBox.Show("Error connecting to COM port: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+        private void SerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        {
+            string data = serialPort.ReadExisting();
+            Dispatcher.Invoke(() =>
+            {
+                // Update ASCII view
+                receivedDataASCII.Append(data);
+                textBoxReceivedDataASCII.Text = receivedDataASCII.ToString();
+                textBoxReceivedDataASCII.ScrollToEnd();
+
+                // Update Hex view
+                byte[] bytes = Encoding.ASCII.GetBytes(data);
+                foreach (byte b in bytes)
+                {
+                    receivedDataHex.AppendFormat("{0:X2} ", b);
+                }
+                textBoxReceivedDataHex.Text = receivedDataHex.ToString();
+                textBoxReceivedDataHex.ScrollToEnd();
+            });
         }
 
         private void ButtonDisconnect_Click(object sender, RoutedEventArgs e)
@@ -98,6 +125,63 @@ namespace IMAGOPrinterProgrammerTool
             byte[] fileBytes = File.ReadAllBytes(filePath);
             hexViewer.Document.Blocks.Clear();
             hexViewer.AppendText(BitConverter.ToString(fileBytes).Replace("-", " "));
+        }
+
+        private void ButtonSendData_Click(object sender, RoutedEventArgs e)
+        {
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                string dataToSend = textBoxSendData.Text;
+                if (!string.IsNullOrEmpty(dataToSend))
+                {
+                    byte[] bytesToSend;
+                    if (IsHex(dataToSend))
+                    {
+                        bytesToSend = StringToByteArray(dataToSend);
+                    }
+                    else
+                    {
+                        bytesToSend = Encoding.ASCII.GetBytes(dataToSend);
+                    }
+
+                    serialPort.Write(bytesToSend, 0, bytesToSend.Length);
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please connect to a COM port first.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ButtonClearData_Click(object sender, RoutedEventArgs e)
+        {
+            receivedDataASCII.Clear();
+            receivedDataHex.Clear();
+            textBoxReceivedDataASCII.Clear();
+            textBoxReceivedDataHex.Clear();
+        }
+
+        private bool IsHex(string input)
+        {
+            foreach (char c in input)
+            {
+                if (!Uri.IsHexDigit(c) && !char.IsWhiteSpace(c))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private byte[] StringToByteArray(string hex)
+        {
+            hex = hex.Replace(" ", "");
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int i = 0; i < hex.Length; i += 2)
+            {
+                bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+            }
+            return bytes;
         }
     }
 }
