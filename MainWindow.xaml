@@ -85,10 +85,10 @@
                         <TextBox x:Name="textBoxTcpIpPort" Margin="0,0,0,20" Background="#8D8D8D" Text="5000"/>
                         
                         <!-- Connect Button -->
-                        <Button x:Name="buttonConnectEth" Content="Connect" Height="30" Click="ButtonConnect_Click"/>
+                        <Button x:Name="buttonConnectEth" Content="Connect" Height="30" Click="ButtonConnect_ClickEth"/>
 
                         <!-- Upload Button -->
-                        <Button x:Name="buttonUploadEth" Content="UPLOAD" Height="30" Width="100" Margin="0,30,0,10" Click="ButtonUpload_Click"/>
+                        <Button x:Name="buttonUploadEth" Content="UPLOAD" Height="30" Width="100" Margin="0,30,0,10" Click="ButtonUpload_ClickEth"/>
 
                         <!-- Progress Bar -->
                         <ProgressBar x:Name="progressBarUploadEth" Height="30" Margin="0,0,0,10"/>

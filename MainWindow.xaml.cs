@@ -12,17 +12,24 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Net;
+using System.Net.Sockets;
+using stm32_custom_flas_loader;
+using System.Threading.Tasks;
 
 namespace IMAGOPrinterProgrammerTool
 {
     public partial class MainWindow : Window
     {
         private SerialPort serialPort;
+        private TcpClient tcpClient;
+        private NetworkStream networkStream;
         private StringBuilder receivedDataASCII = new StringBuilder();
         private StringBuilder receivedDataHex = new StringBuilder();
         private byte[] fileBytes;
         private BackgroundWorker uploadWorker;
         private bool ackFlag = false;
+        private bool ethConnected = false;
+        private bool serialConnected = false;
 
         public class HexViewerRow
         {
@@ -328,6 +335,12 @@ namespace IMAGOPrinterProgrammerTool
         }
         private void ButtonConnect_Click(object sender, RoutedEventArgs e)
         {
+            if(tcpClient.Connected)
+            {
+                MessageBox.Show("Ethernet already connected!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             try
             {
                 if (comboBoxCOMPorts.SelectedItem == null)
@@ -384,13 +397,33 @@ namespace IMAGOPrinterProgrammerTool
         }
 
         private void ButtonDisconnect_Click(object sender, RoutedEventArgs e)
-        {
+        {     
             if (serialPort != null && serialPort.IsOpen)
             {
                 serialPort.Close();
+
                 MessageBox.Show("Disconnected", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+
                 buttonDisconnect.Visibility = Visibility.Collapsed;
                 buttonConnect.Visibility = Visibility.Visible;
+            }
+            else if(tcpClient.Connected)
+            {
+
+                if (networkStream != null)
+                {
+                    networkStream.Close();
+                }
+
+                if (tcpClient != null)
+                {
+                    tcpClient.Close();
+                }
+
+                MessageBox.Show("Disconnected", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                buttonDisconnect.Visibility = Visibility.Collapsed;
+                buttonConnectEth.Visibility = Visibility.Visible;
             }
         }
 
@@ -497,6 +530,78 @@ namespace IMAGOPrinterProgrammerTool
                 bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
             }
             return bytes;
+        }
+        private async Task ConnectToServer(string ipAddress, int port)
+        {
+            try
+            {
+                tcpClient = new TcpClient();
+                await tcpClient.ConnectAsync(ipAddress, port);
+                networkStream = tcpClient.GetStream();
+
+                MessageBox.Show("Connected to the server!");
+
+                buttonDisconnect.Visibility = Visibility.Visible;
+                buttonConnectEth.Visibility = Visibility.Collapsed;
+
+                // Start listening for incoming data
+                StartReceiving();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to connect: {ex.Message}");
+            }
+        }
+
+        private async Task SendData(string data)
+        {
+            if (networkStream != null && networkStream.CanWrite)
+            {
+                byte[] bytesToSend = Encoding.ASCII.GetBytes(data);
+                await networkStream.WriteAsync(bytesToSend, 0, bytesToSend.Length);
+            }
+            else
+            {
+                MessageBox.Show("Unable to send data. No connection or stream is not writable.");
+            }
+        }
+
+        private async void StartReceiving()
+        {
+            byte[] buffer = new byte[1024];
+            try
+            {
+                while (tcpClient.Connected)
+                {
+                    int bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
+                    if (bytesRead > 0)
+                    {
+                        string receivedData = Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                        // Update the UI with received data
+                        Dispatcher.Invoke(() =>
+                        {
+                            textBoxReceivedDataASCII.AppendText(receivedData + "\n");
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error while receiving data: {ex.Message}");
+            }
+        }
+
+        private async void ButtonConnect_ClickEth(object sender, RoutedEventArgs e)
+        {
+            string ipAddr = textBoxIpAddr.Text;
+            int tcpIpPort = int.Parse(textBoxTcpIpPort.Text);
+
+            await ConnectToServer(ipAddr, tcpIpPort);
+        }
+
+        private void ButtonUpload_ClickEth(object sender, RoutedEventArgs e)
+        {
+    
         }
     }
 }
