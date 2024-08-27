@@ -15,6 +15,8 @@ using System.Net;
 using System.Net.Sockets;
 using stm32_custom_flas_loader;
 using System.Threading.Tasks;
+using System.Windows.Markup;
+using System.Linq;
 
 namespace IMAGOPrinterProgrammerTool
 {
@@ -28,8 +30,6 @@ namespace IMAGOPrinterProgrammerTool
         private byte[] fileBytes;
         private BackgroundWorker uploadWorker;
         private bool ackFlag = false;
-        private bool ethConnected = false;
-        private bool serialConnected = false;
 
         public class HexViewerRow
         {
@@ -90,22 +90,35 @@ namespace IMAGOPrinterProgrammerTool
             byte[] commandBytes = System.Text.Encoding.ASCII.GetBytes(command);
 
             // Send the ASCII string to the COM port
-            serialPort.Write(commandBytes, 0, commandBytes.Length);
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.Write(commandBytes, 0, commandBytes.Length);
+            }
+            else if (tcpClient != null && tcpClient.Connected) // Send the ASCII string to the TCP server
+            {
+                if (networkStream != null && networkStream.CanWrite)
+                {
+                    networkStream.Write(commandBytes, 0, commandBytes.Length);
+                }
+            }
         }
 
         private void UploadWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             const byte COMMAND_EXTENDED_ERASE = 0x44;
-            const int CHUNK_SIZE = 256;
-            const uint START_ADDRESS = 0x08000000;
             const byte COMMAND_GO = 0x21;
+            const uint START_ADDRESS = 0x08000000; // flash starting addres stm32f4
+            const int CHUNK_SIZE = 256; // max size for write command 
 
+
+            // Send command to activate bootloader
             SendAsciiString("DO_PROGRAMMING");
 
+            // Delay for configuration
             System.Threading.Thread.Sleep(200);
 
             // Send 0x7F as the next step in the protocol
-            serialPort.Write(new byte[] { 0x7F }, 0, 1);
+            SendHex(new byte[] { 0x7F });
 
             // Wait for 0x79 ACK
             if (!WaitForACK())
@@ -114,7 +127,7 @@ namespace IMAGOPrinterProgrammerTool
                 return;
             }
 
-
+            //ERASE MEMORY
             SendCommand(COMMAND_EXTENDED_ERASE);
 
             // Step 2: Wait for ACK
@@ -125,8 +138,7 @@ namespace IMAGOPrinterProgrammerTool
             }
 
             // Step 3: Send the target address and its checksum
-            byte[] buffer = { 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00 };
-            serialPort.Write(buffer, 0, buffer.Length);
+            SendHex(new byte[] { 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00 });
 
             // Step 4: Wait for ACK
             if (!WaitForACK())
@@ -173,8 +185,8 @@ namespace IMAGOPrinterProgrammerTool
                 return;
             }
 
-            byte[] buffer1 = { 0x08, 0x00, 0x00, 0x00, 0x08};
-            serialPort.Write(buffer1, 0, buffer1.Length);
+            //flash start address
+            SendHex(new byte[] { 0x08, 0x00, 0x00, 0x00, 0x08 });
 
             // Step 4: Wait for ACK
             if (!WaitForACK())
@@ -186,31 +198,58 @@ namespace IMAGOPrinterProgrammerTool
 
         private void UploadWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            progressBarUpload.Value = e.ProgressPercentage;
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                progressBarUpload.Value = e.ProgressPercentage;
+            }
+            else if (tcpClient != null && tcpClient.Connected)
+            {
+                progressBarUploadEth.Value = e.ProgressPercentage;
+            }
         }
 
         private void UploadWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             if (e.Cancelled)
-            {
-                textBlockStatus.Text = "Upload cancelled.";
+            {           
+                if (serialPort != null && serialPort.IsOpen)
+                {
+                    textBlockStatus.Text = "Upload cancelled.";
+                }
+                else if (tcpClient != null && tcpClient.Connected)
+                {
+                    textBlockStatusEth.Text = "Upload cancelled.";
+                }
             }
             else if (e.Error != null)
-            {
-                textBlockStatus.Text = "Error during upload: " + e.Error.Message;
+            {          
+                if (serialPort != null && serialPort.IsOpen)
+                {
+                    textBlockStatus.Text = "Error during upload: " + e.Error.Message;
+                }
+                else if (tcpClient != null && tcpClient.Connected)
+                {
+                    textBlockStatusEth.Text = "Error during upload: " + e.Error.Message;
+                }
             }
             else
             {
                 bool success = (bool)e.Result;
-                textBlockStatus.Text = success ? "Upload and verification successful!" : "Verification failed!";
+               
+                if (serialPort != null && serialPort.IsOpen)
+                {
+                    textBlockStatus.Text = success ? "Upload and verification successful!" : "Verification failed!";
+                }
+                else if (tcpClient != null && tcpClient.Connected)
+                {
+                    textBlockStatusEth.Text = success ? "Upload and verification successful!" : "Verification failed!";
+                }
             }
         }
 
         private bool UploadChunk(uint address, byte[] chunk)
         {
             const byte COMMAND_WRITE_MEMORY = 0x31;
-            const byte ACK = 0x79;
-            const byte NACK = 0x1F;
 
             try
             {
@@ -251,7 +290,27 @@ namespace IMAGOPrinterProgrammerTool
             byte[] commandBuffer = new byte[2];
             commandBuffer[0] = command;
             commandBuffer[1] = (byte)(command ^ 0xFF);  // XOR with 0xFF for checksum
-            serialPort.Write(commandBuffer, 0, commandBuffer.Length);
+
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.Write(commandBuffer, 0, commandBuffer.Length);
+            }
+            else if (tcpClient != null && tcpClient.Connected)
+            {
+                networkStream.Write(commandBuffer, 0, commandBuffer.Length);
+            }
+        }
+
+        private void SendHex(byte[] hex)
+        {
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.Write(hex, 0, hex.Length);
+            }
+            else if (tcpClient != null && tcpClient.Connected)
+            {
+                networkStream.Write(hex, 0, hex.Length);
+            }
         }
 
         private void SendAddressWithChecksum(uint address)
@@ -265,7 +324,14 @@ namespace IMAGOPrinterProgrammerTool
             // Checksum calculation: XOR all bytes of the address
             addressBuffer[4] = (byte)(addressBuffer[0] ^ addressBuffer[1] ^ addressBuffer[2] ^ addressBuffer[3]);
 
-            serialPort.Write(addressBuffer, 0, addressBuffer.Length);
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.Write(addressBuffer, 0, addressBuffer.Length);
+            }
+            else if (tcpClient != null && tcpClient.Connected)
+            {
+                networkStream.Write(addressBuffer, 0, addressBuffer.Length);
+            }
         }
 
         private void SendDataWithChecksum(byte[] data)
@@ -290,7 +356,14 @@ namespace IMAGOPrinterProgrammerTool
             dataBuffer[length + 1] = checksum;
 
             // Send the data buffer
-            serialPort.Write(dataBuffer, 0, dataBuffer.Length);
+            if (serialPort != null && serialPort.IsOpen)
+            {
+                serialPort.Write(dataBuffer, 0, dataBuffer.Length);
+            }
+            else if (tcpClient != null && tcpClient.Connected)
+            {
+                networkStream.Write(dataBuffer, 0, dataBuffer.Length);
+            }
         }
 
         private bool WaitForACK(int timeout = 1000, int retryCount = 3)
@@ -335,7 +408,7 @@ namespace IMAGOPrinterProgrammerTool
         }
         private void ButtonConnect_Click(object sender, RoutedEventArgs e)
         {
-            if(tcpClient.Connected)
+            if(tcpClient != null && tcpClient.Connected)
             {
                 MessageBox.Show("Ethernet already connected!", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
@@ -407,7 +480,7 @@ namespace IMAGOPrinterProgrammerTool
                 buttonDisconnect.Visibility = Visibility.Collapsed;
                 buttonConnect.Visibility = Visibility.Visible;
             }
-            else if(tcpClient.Connected)
+            else if(tcpClient != null && tcpClient.Connected)
             {
 
                 if (networkStream != null)
@@ -495,10 +568,29 @@ namespace IMAGOPrinterProgrammerTool
                     serialPort.Write(bytesToSend, 0, bytesToSend.Length);
                 }
             }
+            else if(tcpClient != null && tcpClient.Connected)
+            {
+                string dataToSend = textBoxSendData.Text;
+                if (!string.IsNullOrEmpty(dataToSend))
+                {
+                    byte[] bytesToSend;
+                    if (IsHex(dataToSend))
+                    {
+                        bytesToSend = StringToByteArray(dataToSend);
+                    }
+                    else
+                    {
+                        bytesToSend = Encoding.ASCII.GetBytes(dataToSend);
+                    }
+
+                    networkStream.Write(bytesToSend, 0, bytesToSend.Length);
+                }
+            }
             else
             {
-                MessageBox.Show("Please connect to a COM port first.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Please connect to a COM port or TCP Client first.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+
         }
 
         private void ButtonClearData_Click(object sender, RoutedEventArgs e)
@@ -539,7 +631,7 @@ namespace IMAGOPrinterProgrammerTool
                 await tcpClient.ConnectAsync(ipAddress, port);
                 networkStream = tcpClient.GetStream();
 
-                MessageBox.Show("Connected to the server!");
+               // MessageBox.Show("Connected to the server!");
 
                 buttonDisconnect.Visibility = Visibility.Visible;
                 buttonConnectEth.Visibility = Visibility.Collapsed;
@@ -553,25 +645,12 @@ namespace IMAGOPrinterProgrammerTool
             }
         }
 
-        private async Task SendData(string data)
-        {
-            if (networkStream != null && networkStream.CanWrite)
-            {
-                byte[] bytesToSend = Encoding.ASCII.GetBytes(data);
-                await networkStream.WriteAsync(bytesToSend, 0, bytesToSend.Length);
-            }
-            else
-            {
-                MessageBox.Show("Unable to send data. No connection or stream is not writable.");
-            }
-        }
-
         private async void StartReceiving()
         {
             byte[] buffer = new byte[1024];
             try
             {
-                while (tcpClient.Connected)
+                while (tcpClient != null && tcpClient.Connected)
                 {
                     int bytesRead = await networkStream.ReadAsync(buffer, 0, buffer.Length);
                     if (bytesRead > 0)
@@ -580,7 +659,21 @@ namespace IMAGOPrinterProgrammerTool
                         // Update the UI with received data
                         Dispatcher.Invoke(() =>
                         {
-                            textBoxReceivedDataASCII.AppendText(receivedData + "\n");
+                            textBoxReceivedDataASCII.AppendText(receivedData);
+                            textBoxReceivedDataASCII.ScrollToEnd();
+
+                            foreach (byte b in buffer.Take(bytesRead))
+                            {
+                                receivedDataHex.AppendFormat("{0:X2} ", b);
+                            }
+
+                            textBoxReceivedDataHex.Text = receivedDataHex.ToString();
+                            textBoxReceivedDataHex.ScrollToEnd();
+
+                            if (receivedData == "y")
+                            {
+                                ackFlag = true;  // ACK received
+                            }
                         });
                     }
                 }
@@ -601,7 +694,16 @@ namespace IMAGOPrinterProgrammerTool
 
         private void ButtonUpload_ClickEth(object sender, RoutedEventArgs e)
         {
-    
+            if (tcpClient != null && tcpClient.Connected && fileBytes != null)
+            {
+                progressBarUploadEth.Value = 0;
+                textBlockStatusEth.Text = "Uploading...";
+                uploadWorker.RunWorkerAsync();
+            }
+            else
+            {
+                MessageBox.Show("Please connect to a TCP Client and load a binary file first.");
+            }
         }
     }
 }

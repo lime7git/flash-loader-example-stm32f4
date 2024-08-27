@@ -39,6 +39,30 @@
         <DockPanel Grid.Row="1" LastChildFill="True">
             <!-- Left Panel -->
             <TabControl Background="#4D4D4D" Margin="10,20,10,20">
+                <TabItem Header="Ethernet">
+                    <StackPanel Width="200" Margin="10">
+                        <!-- IP addr -->
+                        <Label Content="IP Address" Foreground="White"/>
+                        <TextBox x:Name="textBoxIpAddr" Margin="0,0,0,0" Background="#8D8D8D" Text="192.168.0.81" />
+
+                        <!-- TCPIP PORT -->
+                        <Label Content="TCP/IP Port" Foreground="White"/>
+                        <TextBox x:Name="textBoxTcpIpPort" Margin="0,0,0,20" Background="#8D8D8D" Text="5000"/>
+
+                        <!-- Connect Button -->
+                        <Button x:Name="buttonConnectEth" Content="Connect" Height="30" Click="ButtonConnect_ClickEth"/>
+
+                        <!-- Upload Button -->
+                        <Button x:Name="buttonUploadEth" Content="UPLOAD" Height="30" Width="100" Margin="0,30,0,10" Click="ButtonUpload_ClickEth"/>
+
+                        <!-- Progress Bar -->
+                        <ProgressBar x:Name="progressBarUploadEth" Height="30" Margin="0,0,0,10"/>
+
+                        <!-- Status Label -->
+                        <TextBlock x:Name="textBlockStatusEth" Height="30" Margin="0,0,0,10" Foreground="White"/>
+                    </StackPanel>
+                </TabItem>
+                
                 <TabItem Header="Serial">
                     <StackPanel Width="200" Margin="10">
                         <!-- COM Port Selection -->
@@ -73,31 +97,6 @@
                         <TextBlock x:Name="textBlockStatus" Height="30" Margin="0,0,0,10" Foreground="White"/>
                     </StackPanel>
                 </TabItem>
-
-                <TabItem Header="Ethernet">
-                    <StackPanel Width="200" Margin="10">
-                        <!-- IP addr -->
-                        <Label Content="IP Address" Foreground="White"/>
-                        <TextBox x:Name="textBoxIpAddr" Margin="0,0,0,0" Background="#8D8D8D" Text="192.168.0.81" />
-                        
-                        <!-- TCPIP PORT -->
-                        <Label Content="TCP/IP Port" Foreground="White"/>
-                        <TextBox x:Name="textBoxTcpIpPort" Margin="0,0,0,20" Background="#8D8D8D" Text="5000"/>
-                        
-                        <!-- Connect Button -->
-                        <Button x:Name="buttonConnectEth" Content="Connect" Height="30" Click="ButtonConnect_ClickEth"/>
-
-                        <!-- Upload Button -->
-                        <Button x:Name="buttonUploadEth" Content="UPLOAD" Height="30" Width="100" Margin="0,30,0,10" Click="ButtonUpload_ClickEth"/>
-
-                        <!-- Progress Bar -->
-                        <ProgressBar x:Name="progressBarUploadEth" Height="30" Margin="0,0,0,10"/>
-
-                        <!-- Status Label -->
-                        <TextBlock x:Name="textBlockStatusEth" Height="30" Margin="0,0,0,10" Foreground="White"/>
-                    </StackPanel>
-                </TabItem>
-
             </TabControl>
 
             <!-- Main Content Area -->
