@@ -1,7 +1,7 @@
 ﻿<Window x:Class="IMAGOPrinterProgrammerTool.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="IMAGO Printer Programmer Tool" Height="600" Width="800"
+        Title="STM32 flash loader" Height="600" Width="800"
         Background="#4D4D4D">
     
     <Window.Resources>
@@ -34,7 +34,7 @@
         </Grid.RowDefinitions>
 
         <!-- Logo -->
-        <TextBlock Text="IMAGO" FontSize="36" FontWeight="Bold" HorizontalAlignment="Center" Margin="10"/>
+        <TextBlock Text="STM32 flash loader" FontSize="36" FontWeight="Bold" HorizontalAlignment="Center" Margin="10"/>
 
         <DockPanel Grid.Row="1" LastChildFill="True">
             <!-- Left Panel -->

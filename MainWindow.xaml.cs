@@ -30,6 +30,7 @@ namespace IMAGOPrinterProgrammerTool
         private byte[] fileBytes;
         private BackgroundWorker uploadWorker;
         private bool ackFlag = false;
+        ManualResetEvent oSignalEvent;
 
         public class HexViewerRow
         {
@@ -68,6 +69,8 @@ namespace IMAGOPrinterProgrammerTool
             uploadWorker.DoWork += UploadWorker_DoWork;
             uploadWorker.ProgressChanged += UploadWorker_ProgressChanged;
             uploadWorker.RunWorkerCompleted += UploadWorker_RunWorkerCompleted;
+
+            oSignalEvent = new ManualResetEvent(false);
         }
 
         private void ButtonUpload_Click(object sender, RoutedEventArgs e)
@@ -121,31 +124,19 @@ namespace IMAGOPrinterProgrammerTool
             SendHex(new byte[] { 0x7F });
 
             // Wait for 0x79 ACK
-            if (!WaitForACK())
-            {
-                MessageBox.Show("Failed to receive ACK after sending 0x7F. Please check the connection and try again.");
-                return;
-            }
+            WaitForACK();
 
             //ERASE MEMORY
             SendCommand(COMMAND_EXTENDED_ERASE);
 
             // Step 2: Wait for ACK
-            if (!WaitForACK())
-            {
-                MessageBox.Show("Failed to receive ACK after sending 0x44. Please check the connection and try again.");
-                return;
-            }
+            WaitForACK();
 
             // Step 3: Send the target address and its checksum
             SendHex(new byte[] { 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00 });
 
             // Step 4: Wait for ACK
-            if (!WaitForACK())
-            {
-                MessageBox.Show("Failed to receive ACK after sending 0x44. Please check the connection and try again.");
-                return;
-            }
+            WaitForACK();
 
 
             // Send command to start upload
@@ -179,21 +170,13 @@ namespace IMAGOPrinterProgrammerTool
             e.Result = verificationResult;
 
             SendCommand(COMMAND_GO);
-            if (!WaitForACK())
-            {
-                MessageBox.Show("Failed to receive ACK after sending 0x21. Please check the connection and try again.");
-                return;
-            }
+            WaitForACK();
 
             //flash start address
             SendHex(new byte[] { 0x08, 0x00, 0x00, 0x00, 0x08 });
 
             // Step 4: Wait for ACK
-            if (!WaitForACK())
-            {
-                MessageBox.Show("Failed to receive ACK after sending 0x44. Please check the connection and try again.");
-                return;
-            }
+            WaitForACK();
         }
 
         private void UploadWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -257,25 +240,20 @@ namespace IMAGOPrinterProgrammerTool
                 SendCommand(COMMAND_WRITE_MEMORY);
 
                 // Step 2: Wait for ACK
-                if (!WaitForACK())
-                {
-                    return false;
-                }
+                WaitForACK();
 
                 // Step 3: Send the target address and its checksum
                 SendAddressWithChecksum(address);
 
                 // Step 4: Wait for ACK
-                if (!WaitForACK())
-                {
-                    return false;
-                }
+                WaitForACK();
 
                 // Step 5: Send the length (N - 1) and the data, followed by the checksum
                 SendDataWithChecksum(chunk);
 
                 // Step 6: Wait for final ACK
-                return WaitForACK();
+                WaitForACK();
+                return true;
             }
             catch (Exception ex)
             {
@@ -366,15 +344,16 @@ namespace IMAGOPrinterProgrammerTool
             }
         }
 
-        private bool WaitForACK(int timeout = 1000, int retryCount = 3)
+        private void WaitForACK(int timeout = 1000, int retryCount = 3)
         {
-            while (ackFlag == false)
-            {
-                
-            }
+            oSignalEvent.WaitOne();
+            oSignalEvent.Reset(); 
+        }
 
-            ackFlag = false;
-            return true;
+        private bool GetAckFlag()
+        {
+            while (ackFlag != true) { };
+            return ackFlag;
         }
 
         private bool VerifyUpload(byte[] originalData, uint startAddress)
@@ -668,13 +647,14 @@ namespace IMAGOPrinterProgrammerTool
                             }
 
                             textBoxReceivedDataHex.Text = receivedDataHex.ToString();
-                            textBoxReceivedDataHex.ScrollToEnd();
-
-                            if (receivedData == "y")
-                            {
-                                ackFlag = true;  // ACK received
-                            }
+                            textBoxReceivedDataHex.ScrollToEnd();                      
                         });
+
+                        if (receivedData == "y")
+                        {
+                            ackFlag = true;  // ACK received
+                            oSignalEvent.Set();
+                        }
                     }
                 }
             }
